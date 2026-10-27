@@ -3,6 +3,7 @@
 
 import ast
 import hashlib
+import operator
 import secrets
 from pathlib import Path
 
@@ -27,13 +28,11 @@ PARKING_SLOTS = {
     },
 }
 
-TOTAL_COLLECTIONS = 0.0
+TOTAL_COLLECTIONS = {"amount": 0.0}
 
 
 def park_vehicle(slot_id, plate_no, hours_booked=1, entry_logs=None):
     """Park a vehicle and record its booking."""
-    global TOTAL_COLLECTIONS
-
     if entry_logs is None:
         entry_logs = []
 
@@ -47,7 +46,7 @@ def park_vehicle(slot_id, plate_no, hours_booked=1, entry_logs=None):
     slot["plate"] = plate_no
     slot["hours"] = hours_booked
     slot["is_occupied"] = True
-    TOTAL_COLLECTIONS += slot["rate"] * hours_booked
+    TOTAL_COLLECTIONS["amount"] += slot["rate"] * hours_booked
     entry_logs.append(
         f"Vehicle {plate_no} parked at slot {slot_id} "
         f"for {hours_booked} hours."
@@ -116,26 +115,27 @@ def calculate_parking_fee(slot_id, surge_expr):
 def _evaluate_fee_expression(node, base_rate):
     """Evaluate permitted arithmetic without executing arbitrary code."""
     if isinstance(node, ast.Constant):
-        return node.value
-    if isinstance(node, ast.Name):
-        return base_rate
-    if isinstance(node, ast.UnaryOp):
+        result = node.value
+    elif isinstance(node, ast.Name):
+        result = base_rate
+    elif isinstance(node, ast.UnaryOp):
         value = _evaluate_fee_expression(node.operand, base_rate)
-        return value if isinstance(node.op, ast.UAdd) else -value
+        result = value if isinstance(node.op, ast.UAdd) else -value
+    else:
+        left = _evaluate_fee_expression(node.left, base_rate)
+        right = _evaluate_fee_expression(node.right, base_rate)
+        operations = {
+            ast.Add: operator.add,
+            ast.Sub: operator.sub,
+            ast.Mult: operator.mul,
+            ast.Div: operator.truediv,
+        }
+        operation = operations.get(type(node.op))
+        if operation is None:
+            raise ValueError("Unsupported arithmetic operation")
+        result = operation(left, right)
 
-    left = _evaluate_fee_expression(node.left, base_rate)
-    right = _evaluate_fee_expression(node.right, base_rate)
-
-    if isinstance(node.op, ast.Add):
-        return left + right
-    if isinstance(node.op, ast.Sub):
-        return left - right
-    if isinstance(node.op, ast.Mult):
-        return left * right
-    if isinstance(node.op, ast.Div):
-        return left / right
-
-    raise ValueError("Unsupported arithmetic operator")
+    return result
 
 
 def generate_vehicle_hash(plate_no):

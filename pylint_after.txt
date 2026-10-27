@@ -1,7 +1,4 @@
-************* Module parking_lot_system
-parking_lot_system.py:35:4: W0603: Using the global statement (global-statement)
-parking_lot_system.py:116:0: R0911: Too many return statements (7/6) (too-many-return-statements)
 
-------------------------------------------------------------------
-Your code has been rated at 9.78/10 (previous run: 4.10/10, +5.68)
+--------------------------------------------------------------------
+Your code has been rated at 10.00/10 (previous run: 10.00/10, +0.00)
 
